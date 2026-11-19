@@ -1,0 +1,503 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Wonder Island</title>
+<style>
+:root{--ink:#1d2340;--card:#ffffffee;--a:#ff6b6b;--b:#4dabf7;--c:#51cf66}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:#9be7ff;font-family:"Nunito","Baloo 2","Trebuchet MS","Comic Sans MS",system-ui,sans-serif;color:var(--ink);touch-action:none;user-select:none}
+canvas{display:block;position:fixed;inset:0;width:100%;height:100%}
+.hidden{display:none!important}
+button{font:inherit;color:inherit;cursor:pointer;border:0}
+.btn{background:#fff;border-radius:18px;padding:10px 18px;font-weight:800;box-shadow:0 4px 0 #0002;transition:transform .08s}
+.btn:active{transform:translateY(3px);box-shadow:0 1px 0 #0002}
+.btn.go{background:var(--c);color:#fff;font-size:1.25rem;padding:14px 26px}
+#hud{position:fixed;top:10px;left:10px;right:10px;display:flex;gap:8px;align-items:center;pointer-events:none}
+#hud>*{pointer-events:auto}
+.pill{background:var(--card);border-radius:999px;padding:8px 16px;font-weight:800;box-shadow:0 3px 0 #0002}
+#hud .sp{flex:1;pointer-events:none}
+.ib{width:44px;height:44px;border-radius:50%;background:var(--card);font-size:1.3rem;box-shadow:0 3px 0 #0002}
+#help{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);background:#0007;color:#fff;padding:8px 14px;border-radius:14px;font-size:.9rem;text-align:center;max-width:92vw;transition:opacity .6s}
+#prompt{position:fixed;bottom:70px;left:50%;transform:translateX(-50%)}
+#prompt .btn{font-size:1.3rem;padding:16px 28px;background:#ffd43b;animation:pop 1s infinite alternate}
+@keyframes pop{to{transform:scale(1.07)}}
+.screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 30%,#b9f0ffcc,#5aa9ffdd);padding:14px;overflow:auto}
+.card{background:#fff;border-radius:28px;padding:22px;max-width:620px;width:100%;box-shadow:0 10px 0 #0002;text-align:center}
+.card h1{margin:0 0 4px;font-size:2.2rem}
+.card p{margin:6px 0 12px}
+.row{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:10px 0}
+.age{flex:1 1 150px;background:#f1f3ff;border:4px solid transparent;border-radius:20px;padding:10px;font-weight:800}
+.age small{display:block;font-weight:600;opacity:.7}
+.age.sel{border-color:var(--b);background:#e3f2ff}
+.dot{width:38px;height:38px;border-radius:50%;border:4px solid #fff;box-shadow:0 0 0 3px #0002}
+.dot.sel{box-shadow:0 0 0 4px var(--ink)}
+input#name{font:inherit;font-size:1.2rem;padding:10px 14px;border-radius:14px;border:3px solid #cfd6ff;text-align:center;width:min(280px,100%)}
+.fine{font-size:.78rem;opacity:.7}
+#quiz{position:fixed;left:0;right:0;bottom:0;padding:12px;display:flex;justify-content:center}
+#quiz .panel{background:var(--card);border-radius:26px;padding:14px 16px;width:min(760px,100%);box-shadow:0 -4px 0 #0002;backdrop-filter:blur(6px)}
+.qtop{display:flex;align-items:center;gap:8px;font-weight:800}
+.qtop .sp{flex:1}
+#qdots span{display:inline-block;width:14px;height:14px;border-radius:50%;background:#d0d6ee;margin:0 3px}
+#qdots span.on{background:var(--c)}#qdots span.cur{background:var(--b)}
+#qtext{font-size:clamp(1.15rem,3.6vw,1.7rem);font-weight:800;margin:10px 0}
+#qans{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+#qans button{font-size:clamp(1.05rem,3vw,1.4rem);font-weight:800;padding:16px 10px;border-radius:18px;color:#fff;box-shadow:0 5px 0 #0003;min-height:64px}
+#qans button:nth-child(1){background:#ff6b6b}#qans button:nth-child(2){background:#4dabf7}#qans button:nth-child(3){background:#9775fa}
+#qans button.bad{background:#adb5bd!important;opacity:.55}
+#qans button.good{background:var(--c)!important}
+#qans button:disabled{cursor:default}
+#qfb{margin-top:10px;padding:12px;border-radius:16px;background:#e6fcf5;font-weight:700;display:flex;gap:12px;align-items:center;justify-content:space-between}
+#qfb.try{background:#fff3bf}
+.shake{animation:shake .3s}
+@keyframes shake{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+#fade{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .3s}
+#fade.on{opacity:1}
+.bigstars{font-size:3rem;letter-spacing:6px}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="hud" class="hidden">
+  <div class="pill" id="hudName">🤖 Explorer</div>
+  <div class="pill" id="hudStars">⭐ 0</div>
+  <div class="pill" id="hudTier"></div>
+  <div class="sp"></div>
+  <button class="ib" id="btnVoice" title="Read questions aloud">🗣️</button>
+  <button class="ib" id="btnSound" title="Sound on/off">🔊</button>
+</div>
+<div id="help" class="hidden">Move: arrow keys / WASD, or drag. Tap the ground to walk there. Walk up to a glowing building to go inside!</div>
+<div id="prompt" class="hidden"><button class="btn" id="btnEnter"></button></div>
+
+<div id="title" class="screen">
+  <div class="card">
+    <h1>🏝️ Wonder Island</h1>
+    <p>Explore a 3D island where every building is a subject. Math, reading, science, space, history, art, music, health, coding and AI!</p>
+    <input id="name" maxlength="14" placeholder="Your name" autocomplete="off">
+    <p><b>How old are you?</b></p>
+    <div class="row" id="ages">
+      <button class="age" data-t="0">🌱 Sprout<small>ages 5–7</small></button>
+      <button class="age" data-t="1">🚀 Ranger<small>ages 8–10</small></button>
+      <button class="age" data-t="2">🧠 Pioneer<small>ages 11–13</small></button>
+    </div>
+    <p><b>Pick your robot buddy's color</b></p>
+    <div class="row" id="colors"></div>
+    <button class="btn go" id="btnStart">Let's go! ▶</button>
+    <p class="fine">No ads, no accounts. Progress is saved only on this device.</p>
+  </div>
+</div>
+
+<div id="quiz" class="hidden"><div class="panel">
+  <div class="qtop">
+    <span id="qzone"></span><span id="qdots"></span><span class="sp"></span>
+    <button class="btn hidden" id="qlisten">🎵 Listen</button>
+    <button class="btn" id="qspeak">🔊 Read</button>
+    <button class="btn" id="qexit">✕</button>
+  </div>
+  <div id="qtext"></div>
+  <div id="qans"></div>
+  <div id="qfb" class="hidden"><span id="qfbtext"></span><button class="btn go" id="qnext">Next ▶</button></div>
+</div></div>
+
+<div id="summary" class="screen hidden"><div class="card">
+  <h1 id="sumTitle">Great job!</h1>
+  <div class="bigstars" id="sumStars"></div>
+  <p id="sumText"></p>
+  <div class="row">
+    <button class="btn" id="sumAgain">🔁 Play again</button>
+    <button class="btn" id="sumEasier">⬇ Easier</button>
+    <button class="btn" id="sumHarder">⬆ Harder</button>
+    <button class="btn go" id="sumHome">🏝️ Island</button>
+  </div>
+</div></div>
+<div id="fade"></div>
+
+<script src="three.min.js"></script>
+<script>
+(()=>{
+'use strict';
+const $=id=>document.getElementById(id);
+const R=(a,b)=>a+Math.floor(Math.random()*(b-a+1));
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=R(0,i);[a[i],a[j]]=[a[j],a[i]]}return a};
+
+/* ---------- save data ---------- */
+const KEY='wonder-island-v1';
+const S={name:'Explorer',tier:0,color:'#ffb703',voice:true,sound:true,stars:{}};
+try{Object.assign(S,JSON.parse(localStorage.getItem(KEY))||{})}catch(e){}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const starsOf=(id,t)=>((S.stars[id]||[])[t])||0;
+const totalStars=()=>Object.values(S.stars).reduce((a,v)=>a+v.reduce((x,y)=>x+(y||0),0),0);
+
+/* ---------- content ---------- */
+const Q=(q,a,w1,w2,fact,viz)=>({q,a,w:[w1,w2],fact,viz:viz||'gem'});
+function near(ans,spread,allowNeg){const s=new Set();let g=0;while(s.size<2&&g++<99){const w=ans+R(-spread,spread);if(w!==ans&&(allowNeg||w>=0))s.add(w)}return[...s]}
+function N(q,ans,spread,fact,viz,neg){const w=near(ans,spread,neg);return Q(q,String(ans),String(w[0]),String(w[1]),fact,viz)}
+
+const MATH=[
+ ()=>[ (n=>N(`How many apples can you count? 🍎`,n,2,`You counted ${n}! Touch each one as you count.`,`count:${n}`))(R(2,9)),
+       (a=>(b=>N(`${a} + ${b} = ?`,a+b,2,`${a} and ${b} together make ${a+b}.`,`count:${a+b}`))(R(1,5)))(R(1,5)),
+       (a=>(b=>N(`${a} − ${b} = ?`,a-b,2,`Take ${b} away from ${a} and ${a-b} are left.`,`count:${a}`))(R(1,5)))(R(6,10)) ],
+ ()=>[ (a=>(b=>N(`${a} × ${b} = ?`,a*b,6,`${a} × ${b} means ${a} groups of ${b}, which is ${a*b}.`,`count:${Math.min(a*b,30)}`))(R(2,9)))(R(2,9)),
+       (a=>(b=>N(`${a} + ${b} = ?`,a+b,10,`Add the tens, then the ones: ${a} + ${b} = ${a+b}.`,'blocks'))(R(12,48)))(R(12,38)),
+       (k=>N(`A pizza has 4 equal slices. What is ¼ of ${4*k} slices?`,k,3,`Split ${4*k} into 4 equal groups: ${k} in each.`,'pie:4'))(R(2,12)) ],
+ ()=>[ (()=>{const p=pick([10,20,25,50]),b=pick([40,60,80,120,200]),a=b*p/100;return N(`What is ${p}% of ${b}?`,a,Math.max(4,a/2|0),`${p}% of ${b} = ${a}.`,`pie:${100/p|0}`)})(),
+       (()=>{const x=R(2,9),a=R(2,6),b=R(1,9);return N(`Solve for x:  ${a}x + ${b} = ${a*x+b}`,x,3,`Subtract ${b}, then divide by ${a}: x = ${x}.`,'balance')})(),
+       pick([()=>{const w=R(6,15),h=R(4,12);return N(`A rectangle is ${w} by ${h}. What is its area?`,w*h,8,`Area = width × height = ${w*h}.`,`rect:${w},${h}`)},
+             ()=>{const a=R(2,9),b=R(2,6),c=R(2,6);return N(`What is ${a} + ${b} × ${c}?`,a+b*c,6,`Multiply first: ${b}×${c}=${b*c}, then add ${a}.`,'blocks')}])() ]
+];
+
+const SUBJECTS=[
+ {id:'math',name:'Number Mountain',emoji:'🔢',color:0xff7043,gen:t=>MATH[t]()},
+ {id:'read',name:'Word Woods',emoji:'📚',color:0xff8fab,bank:[
+  [Q('Which word starts with the same sound as "ball"?','bat','cup','sun','Ball and bat both start with the /b/ sound!','book'),
+   Q('Which word rhymes with "cat"?','hat','dog','sun','Cat and hat both end in "-at".','book'),
+   Q('What letter comes right after C?','D','B','E','A, B, C, D … D comes next!','book')],
+  [Q('Which word means the OPPOSITE of "huge"?','tiny','giant','large','Huge and tiny are antonyms, words with opposite meanings.','book'),
+   Q('Which is spelled correctly?','friend','freind','frend','Remember: "I" before "E" … a friend to the end!','book'),
+   Q('Which word is a NOUN (a naming word)?','elephant','jump','quickly','Nouns name people, places and things.','book')],
+  [Q('Which sentence has a SIMILE?','She ran like the wind.','The wind was angry.','Time is money.','A simile compares two things using "like" or "as".','book'),
+   Q('What does "reluctant" mean?','unwilling','eager','sleepy','Someone reluctant does not really want to do something.','book'),
+   Q('Which sentence is punctuated correctly?','Let\'s eat, Grandma!','Lets eat Grandma!','Let\'s eat Grandma!','Commas save lives!','book')]]},
+ {id:'sci',name:'Science Lab',emoji:'🔬',color:0x51cf66,bank:[
+  [Q('What do plants need to grow?','Sun and water','Candy','Toys','Plants make their own food from sunlight, water and air.','plant'),
+   Q('Which animal has feathers and lays eggs?','A bird','A dog','A cat','Birds are the only animals with feathers.','plant'),
+   Q('What do we see when it rains while the sun shines?','A rainbow','A volcano','A snowman','Sunlight splits into colors inside raindrops!','drop')],
+  [Q('What state of matter is ice?','Solid','Liquid','Gas','Ice is frozen water, a solid. Heat it and it melts to a liquid.','ice'),
+   Q('Which force pulls things down toward the ground?','Gravity','Wind','Sound','Gravity keeps our feet on the ground, and the Moon around Earth.','gem'),
+   Q('Animals that eat only plants are called…','Herbivores','Carnivores','Insects','Herbi-vore: "plant eater". Cows and rabbits are herbivores.','plant')],
+  [Q('Which gas do plants take in for photosynthesis?','Carbon dioxide','Oxygen','Nitrogen','Plants breathe in CO₂ and release the oxygen we need.','plant'),
+   Q('What is at the center of an atom?','The nucleus','The shell','The cell','Electrons zoom around the nucleus, which holds protons and neutrons.','atom'),
+   Q('What is the chemical formula for water?','H₂O','CO₂','O₂','Two hydrogen atoms + one oxygen atom = H₂O.','drop')]]},
+ {id:'space',name:'Star Port',emoji:'🚀',color:0x5c7cfa,bank:[
+  [Q('Which star gives us light and heat in the day?','The Sun','The Moon','A cloud','The Sun is a giant ball of hot glowing gas.','planet:sun'),
+   Q('Which planet do we live on?','Earth','Mars','Jupiter','Earth is the only planet we know that has life.','planet:earth'),
+   Q('What shines at night and seems to change shape?','The Moon','The Sun','A kite','The Moon looks different as it travels around Earth.','planet:moon')],
+  [Q('Which planet has big beautiful rings?','Saturn','Mars','Venus','Saturn\'s rings are made of ice and rock.','planet:saturn'),
+   Q('How many planets orbit our Sun?','8','9','7','Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, Neptune!','solar'),
+   Q('What is the closest star to Earth?','The Sun','Sirius','Mars','The Sun is a star, only about 150 million km away.','planet:sun')],
+  [Q('Why do we have seasons?','Earth\'s axis is tilted','Earth moves closer and farther','The Sun gets bigger and smaller','The tilt changes how directly sunlight hits each part of Earth.','planet:earth'),
+   Q('A "light-year" measures…','Distance','Time','Speed','It is how far light travels in one year: about 9.5 trillion km!','solar'),
+   Q('Which planet is the hottest?','Venus','Mercury','Mars','Venus\' thick clouds trap heat, hotter than Mercury!','planet:venus')]]},
+ {id:'world',name:'Globe Town',emoji:'🌍',color:0xffa94d,bank:[
+  [Q('Which one is a continent?','Africa','London','Texas','There are 7 continents, and Africa is one of them.','globe'),
+   Q('What helps us find our way around places?','A map','A menu','A ticket','Maps show where things are.','globe'),
+   Q('Which is the biggest?','An ocean','A pond','A puddle','Oceans cover most of our planet!','globe')],
+  [Q('Who built the great pyramids?','Ancient Egyptians','Vikings','Romans','The pyramids in Egypt are over 4,000 years old.','pyramid'),
+   Q('What is the capital of Japan?','Tokyo','Kyoto','Seoul','Tokyo is one of the biggest cities in the world.','globe'),
+   Q('Which is the largest ocean?','Pacific','Atlantic','Indian','The Pacific Ocean is bigger than all the land put together!','globe')],
+  [Q('What was the Silk Road?','Trade routes linking East and West','A road made of silk','A river in China','Goods, ideas and inventions traveled along it for centuries.','globe'),
+   Q('"Democracy" means rule by…','The people','One king','The army','Citizens vote to choose leaders and laws.','globe'),
+   Q('The Industrial Revolution changed life by…','Moving work into factories with machines','Ending all farming','Inventing the internet','Machines and factories changed how people lived and worked.','gem')]]},
+ {id:'art',name:'Color Studio',emoji:'🎨',color:0xf06595,bank:[
+  [Q('Red + Yellow = ?','Orange','Green','Purple','Red and yellow mix to make orange, like a sunset!','mix:#ff2d2d,#ffe600'),
+   Q('Blue + Yellow = ?','Green','Orange','Pink','Blue and yellow make green, like grass!','mix:#2d6bff,#ffe600'),
+   Q('Red + Blue = ?','Purple','Green','Orange','Red and blue make purple.','mix:#ff2d2d,#2d6bff')],
+  [Q('Which are the three PRIMARY colors?','Red, yellow, blue','Red, green, orange','Black, white, gray','Every other color can be mixed from these three.','palette'),
+   Q('Which colors feel WARM?','Red, orange, yellow','Blue, green, purple','Gray, white, silver','Warm colors remind us of the Sun and fire.','palette'),
+   Q('A picture of a person\'s face is called a…','Portrait','Landscape','Sculpture','A landscape shows scenery; a portrait shows a person.','palette')],
+  [Q('Which color is OPPOSITE blue on the color wheel?','Orange','Green','Purple','Opposites (complementary colors) look extra bright side by side.','mix:#2d6bff,#ff8a00'),
+   Q('"Perspective" in drawing means…','Making flat pictures look deep','A kind of paint','A picture frame','Things that are far away look smaller.','palette'),
+   Q('Adding white to a color makes a…','Tint','Shade','Rainbow','A tint is lighter; a shade is made by adding black.','palette')]]},
+ {id:'music',name:'Melody Hills',emoji:'🎵',color:0x9775fa,bank:[
+  [Q('Press 🎵 Listen. Is this note HIGH or LOW?','High','Low','Silent','Fast vibrations make high notes!','note:880'),
+   Q('Press 🎵 Listen. Is this note HIGH or LOW?','Low','High','Silent','Slow vibrations make low notes, like a big drum.','note:130'),
+   Q('Which instrument do you hit with sticks?','Drum','Flute','Violin','Drums are percussion instruments.','drum')],
+  [Q('How many lines are on a music staff?','5','4','6','Notes sit on and between the 5 lines.','note:440'),
+   Q('The violin belongs to which family?','Strings','Brass','Percussion','Strings are plucked or played with a bow.','note:660'),
+   Q('In music, "forte" means…','Loud','Soft','Fast','Piano means soft, forte means loud!','note:523')],
+  [Q('How many different note names are in a major scale?','7','8','12','A, B, C, D, E, F, G, then they repeat higher!','note:392'),
+   Q('Three or more notes played together make a…','Chord','Rest','Tempo','Chords are the building blocks of harmony.','note:330'),
+   Q('In 4/4 time, the top number tells you…','Beats in each measure','Number of notes','Number of players','4/4 means four beats in every measure.','drum')]]},
+ {id:'body',name:'Body Gym',emoji:'🫀',color:0xff6b6b,bank:[
+  [Q('What should we do before eating?','Wash our hands','Jump 10 times','Take a nap','Washing washes germs down the drain!','heart'),
+   Q('Which one is a fruit?','Banana','Cookie','Pizza','Fruits give us vitamins and energy.','heart'),
+   Q('What do we smell with?','Nose','Ears','Knees','Your nose can tell thousands of smells apart.','heart')],
+  [Q('What does the heart do?','Pumps blood','Digests food','Helps us think','Your heart beats about 100,000 times a day!','heart'),
+   Q('Which helps build strong bones?','Milk (calcium)','Candy','Soda','Calcium builds bones and teeth.','heart'),
+   Q('How much sleep do kids need each night?','9 to 11 hours','2 hours','15 hours','Sleep helps your brain and body grow.','heart')],
+  [Q('Which blood cells carry oxygen?','Red blood cells','White blood cells','Platelets','Oxygen gets delivered all around your body!','heart'),
+   Q('Which cells help defend against germs?','White blood cells','Red blood cells','Bone cells','Part of your immune system.','heart'),
+   Q('Which nutrient helps repair and build muscles?','Protein','Sugar','Salt','Eggs, beans and fish are protein-rich.','heart')]]},
+ {id:'code',name:'Code Cove',emoji:'💻',color:0x22b8cf,bank:[
+  [Q('What comes next? 🔴🔵🔴🔵🔴 ?','🔵','🔴','🟢','Spotting patterns is the first step of coding.','tiles:RBRBR'),
+   Q('What do you put on first?','Socks, then shoes','Shoes, then socks','Both at once','Order matters. Computers need steps in the right order too.','tiles:RBR'),
+   Q('A robot is told: "Jump 3 times." How many jumps?','3','2','10','Robots do exactly what the instructions say.','tiles:RRR')],
+  [Q('"Repeat 4 times: clap." How many claps?','4','1','2','A loop repeats steps so you don\'t have to write them again.','tiles:RRRR'),
+   Q('In coding, a "bug" is…','A mistake in the program','A real insect','A game level','Fixing mistakes is called debugging.','tiles:RRBR'),
+   Q('A step-by-step set of instructions is called an…','Algorithm','Emoji','Cursor','Recipes are algorithms for cooking!','tiles:RBGB')],
+  [Q('x = 5. Then x = x + 3. What is x now?','8','5','3','The computer calculates the right side, then stores it in x.','tiles:RRR'),
+   Q('if score > 10 then show "Win". The score is 7. What shows?','Nothing','Win','An error','7 is not bigger than 10, so the if-block is skipped.','tiles:RB'),
+   Q('Binary number 101 equals what in everyday numbers?','5','3','101','Computers count with only 0s and 1s! 4 + 0 + 1 = 5.','bits:101')]]},
+ {id:'ai',name:'AI Lab',emoji:'🤖',color:0x12b886,bank:[
+  [Q('A computer that can learn and make smart choices is called…','AI','A spoon','A rock','AI stands for Artificial Intelligence.','robot'),
+   Q('Who teaches AI how to learn?','People','Nobody','Only animals','People build AI and give it examples to learn from.','robot'),
+   Q('Should you tell a chatbot your home address?','No, keep it private','Yes, always','Only on Tuesdays','Keep private info safe. Ask a grown-up first.','robot')],
+  [Q('AI learns from lots of examples. These are called…','Data','Paint','Snacks','More good data helps AI learn better.','net'),
+   Q('To teach AI to spot cats, you show it many…','Labeled cat pictures','Pizza recipes','Songs','It finds patterns: whiskers, ears, tails!','net'),
+   Q('Can AI make mistakes?','Yes, sometimes','Never','Only at night','Always double-check what AI tells you.','robot')],
+  [Q('A "neural network" is inspired by…','The human brain','A spider web','A bicycle','Layers of tiny connected "neurons" pass signals along.','net'),
+   Q('"Bias" in AI is when…','It learned unfair patterns from unbalanced data','The battery is low','It runs fast','Diverse training data helps make AI fairer.','net'),
+   Q('A chatbot gives a confident but WRONG answer. This is called a…','Hallucination','Sunburn','Hibernation','AI can sound sure and still be wrong. Check facts!','robot')]]}
+];
+const tierName=['Sprout','Ranger','Pioneer'];
+const questionsFor=(sub,tier)=>sub.gen?sub.gen(tier):shuffle(sub.bank[tier]);
+
+/* ---------- audio ---------- */
+let AC=null;
+function ac(){if(!AC){try{AC=new(window.AudioContext||window.webkitAudioContext)()}catch(e){}}return AC}
+function tone(f,d=.2,type='sine',v=.15,when=0){if(!S.sound)return;const a=ac();if(!a)return;const o=a.createOscillator(),g=a.createGain(),t=a.currentTime+when;o.type=type;o.frequency.value=f;g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.001,t+d);o.connect(g);g.connect(a.destination);o.start(t);o.stop(t+d)}
+const sfx={good(){[523,659,784,1047].forEach((f,i)=>tone(f,.25,'triangle',.18,i*.08))},bad(){tone(220,.25,'sawtooth',.08);tone(185,.3,'sawtooth',.08,.12)},click(){tone(600,.07,'square',.06)},win(){[523,659,784,659,784,1047].forEach((f,i)=>tone(f,.3,'triangle',.18,i*.1))}};
+function speak(text){if(!S.voice||!('speechSynthesis' in window))return;try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu,' '));u.rate=.9;u.pitch=1.15;speechSynthesis.speak(u)}catch(e){}}
+
+/* ---------- three.js setup ---------- */
+const canvas=$('c');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x9be7ff);
+scene.fog=new THREE.Fog(0x9be7ff,70,200);
+const camera=new THREE.PerspectiveCamera(55,1,.1,500);
+scene.add(new THREE.HemisphereLight(0xffffff,0x6a8f5a,.9));
+const sun=new THREE.DirectionalLight(0xfff2d0,.9);sun.position.set(20,40,15);scene.add(sun);
+function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix()}
+addEventListener('resize',resize);resize();
+
+const mat=(c,o={})=>new THREE.MeshStandardMaterial(Object.assign({color:c,roughness:.7,metalness:.05},o));
+const mesh=(g,c,o)=>new THREE.Mesh(g,c&&c.isMaterial?c:mat(c,o));
+const place=(m,x,y,z)=>{m.position.set(x,y,z);return m};
+function canvasSprite(w,h,draw,sx,sy){const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');const tex=new THREE.CanvasTexture(c);const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:false}));sp.scale.set(sx,sy,1);sp.renderOrder=10;const redraw=(...a)=>{x.clearRect(0,0,w,h);draw(x,w,h,...a);tex.needsUpdate=true};redraw();return{sp,redraw}}
+
+/* ---------- island ---------- */
+const island=new THREE.Group();scene.add(island);
+const water=place(mesh(new THREE.CircleGeometry(300,48),0x2fa8e6,{transparent:true,opacity:.85,roughness:.2}),0,-1.2,0);water.rotation.x=-Math.PI/2;island.add(water);
+island.add(place(mesh(new THREE.CylinderGeometry(37.5,39,3,56),0xf4dfa0),0,-.8,0));
+island.add(place(mesh(new THREE.CylinderGeometry(34,36,3.6,56),0x6fcf61),0,-.5,0));
+const ring=mesh(new THREE.RingGeometry(14.8,19.2,64),0xf1e6c8);ring.rotation.x=-Math.PI/2;ring.position.y=1.31;island.add(ring);
+const plaza=mesh(new THREE.CircleGeometry(7,40),0xe8dcc0);plaza.rotation.x=-Math.PI/2;plaza.position.y=1.32;island.add(plaza);
+// wonder tree
+{const t=new THREE.Group();t.add(place(mesh(new THREE.CylinderGeometry(2.6,2.8,.9,32),0xced4da),0,.45,0),place(mesh(new THREE.CylinderGeometry(2.2,2.2,.8,32),0x4dc3ff,{transparent:true,opacity:.85}),0,.55,0),place(mesh(new THREE.CylinderGeometry(.3,.4,1.4,12),0xced4da),0,1.1,0));
+ const star=place(mesh(new THREE.OctahedronGeometry(.6),0xffd43b,{emissive:0xffa000,emissiveIntensity:.7}),0,2.7,0);t.add(star);
+ for(let i=0;i<8;i++){const a=i/8*Math.PI*2;t.add(place(mesh(new THREE.OctahedronGeometry(.18),0xffd43b,{emissive:0xffa000,emissiveIntensity:.6}),Math.cos(a)*1.6,1.9,Math.sin(a)*1.6))}
+ t.position.y=1.3;island.add(t);}
+const rng=(()=>{let s=7;return()=>(s=(s*16807)%2147483647)/2147483647})();
+for(let i=0;i<46;i++){const a=rng()*Math.PI*2,r=21+rng()*11.5;const t=new THREE.Group();const h=1.5+rng()*1.8;
+ t.add(place(mesh(new THREE.CylinderGeometry(.25,.35,h,6),0x8d5a3a),0,h/2,0));
+ const cr=rng()>.5?mesh(new THREE.ConeGeometry(1.2,2.8,7),0x2f9e44):mesh(new THREE.SphereGeometry(1.3,10,8),0x40c057);cr.position.y=h+1;t.add(cr);
+ t.position.set(Math.cos(a)*r,1.3,Math.sin(a)*r);island.add(t)}
+for(let i=0;i<80;i++){const a=rng()*Math.PI*2,r=rng()*32;const f=place(mesh(new THREE.SphereGeometry(.16,6,5),[0xff6b6b,0xffd43b,0xffffff,0xf783ac][i%4]),Math.cos(a)*r,1.4,Math.sin(a)*r);island.add(f)}
+const clouds=[];for(let i=0;i<9;i++){const g=new THREE.Group();for(let j=0;j<4;j++)g.add(place(mesh(new THREE.SphereGeometry(2+rng()*1.5,10,8),0xffffff,{transparent:true,opacity:.92}),j*2.2-3,rng(),rng()*1.5));g.position.set(-90+rng()*180,22+rng()*14,-90+rng()*180);scene.add(g);clouds.push(g)}
+
+/* stations */
+const stations=[];
+const stationBuilders={
+ math:(g,c)=>{[[0,0],[1.3,0],[.65,1.2]].forEach(([x,y],i)=>g.add(place(mesh(new THREE.BoxGeometry(1.2,1.2,1.2),[0xff7043,0xffa94d,0xffd43b][i]),x-.65,.7+y,0)))},
+ read:(g,c)=>{const l=place(mesh(new THREE.BoxGeometry(2,.3,2.6),0xffffff),-1.05,1.1,0);l.rotation.z=.3;const r=place(mesh(new THREE.BoxGeometry(2,.3,2.6),0xffffff),1.05,1.1,0);r.rotation.z=-.3;g.add(l,r,place(mesh(new THREE.BoxGeometry(.3,.5,2.7),c),0,.7,0))},
+ sci:(g,c)=>{g.add(place(mesh(new THREE.SphereGeometry(1.4,20,16),c,{transparent:true,opacity:.85}),0,1.5,0),place(mesh(new THREE.CylinderGeometry(.5,.5,1.6,16),0xdee2e6),0,3,0))},
+ space:(g,c)=>{g.add(place(mesh(new THREE.CylinderGeometry(.8,.8,3,16),0xffffff),0,2.2,0),place(mesh(new THREE.ConeGeometry(.8,1.4,16),0xff6b6b),0,4.4,0));[0,1,2].forEach(i=>{const f=place(mesh(new THREE.BoxGeometry(.2,1.2,.9),0xff6b6b),Math.cos(i*2.1)*1,1,Math.sin(i*2.1)*1);f.rotation.y=-i*2.1;g.add(f)})},
+ world:(g,c)=>{const gl=mesh(new THREE.SphereGeometry(1.5,24,18),0x339af0);gl.position.y=2.4;g.add(gl,place(mesh(new THREE.SphereGeometry(.55,8,6),0x51cf66),.8,2.9,.9),place(mesh(new THREE.SphereGeometry(.5,8,6),0x51cf66),-.9,2.2,.9),place(mesh(new THREE.CylinderGeometry(.2,.6,1,10),0x868e96),0,.5,0));g.userData.spin=gl},
+ art:(g,c)=>{g.add(place(mesh(new THREE.CylinderGeometry(1.8,1.8,.3,24),0xffe8cc),0,.5,0));[0xff6b6b,0xffd43b,0x4dabf7,0x51cf66,0x9775fa].forEach((col,i)=>g.add(place(mesh(new THREE.SphereGeometry(.4,10,8),col),Math.cos(i*1.26)*1.1,.9,Math.sin(i*1.26)*1.1)));g.add(place(mesh(new THREE.BoxGeometry(.2,3.4,.2),0x8d5a3a),0,2.2,-.2),place(mesh(new THREE.BoxGeometry(2.4,1.8,.2),0xffffff),0,3.3,-.2))},
+ music:(g,c)=>{[[0,1.2,.9],[1,.9,.7],[-1,.7,.6]].forEach(([x,h,r],i)=>g.add(place(mesh(new THREE.CylinderGeometry(r,r,h*1.8,20),[c,0xffd43b,0xff6b6b][i]),x*1.2,h*.9+.3,i*.2)));g.add(place(mesh(new THREE.SphereGeometry(.45,12,10),0x212529),0,3.5,0),place(mesh(new THREE.CylinderGeometry(.08,.08,1.7,6),0x212529),.4,4.3,0))},
+ body:(g,c)=>{const h=new THREE.Group();h.add(place(mesh(new THREE.SphereGeometry(.95,16,12),0xff4d4d),-.6,0,0),place(mesh(new THREE.SphereGeometry(.95,16,12),0xff4d4d),.6,0,0));const co=mesh(new THREE.ConeGeometry(1.5,1.9,4),0xff4d4d);co.rotation.z=Math.PI;co.position.y=-.9;co.rotation.y=Math.PI/4;h.add(co);h.position.y=2.5;g.add(h);g.userData.beat=h},
+ code:(g,c)=>{g.add(place(mesh(new THREE.BoxGeometry(3,2.2,.5),0x343a40),0,2.1,0),place(mesh(new THREE.BoxGeometry(2.6,1.8,.1),0x20c997,{emissive:0x0ca678,emissiveIntensity:.8}),0,2.1,.3),place(mesh(new THREE.BoxGeometry(1.6,.3,1),0x495057),0,.8,.2))},
+ ai:(g,c)=>{g.add(place(mesh(new THREE.BoxGeometry(2.4,2,2),0xced4da),0,2,0),place(mesh(new THREE.SphereGeometry(.38,10,8),0x20c997,{emissive:0x12b886,emissiveIntensity:1}),-.55,2.3,1.02),place(mesh(new THREE.SphereGeometry(.38,10,8),0x20c997,{emissive:0x12b886,emissiveIntensity:1}),.55,2.3,1.02),place(mesh(new THREE.BoxGeometry(1.2,.2,.1),0x495057),0,1.5,1.02),place(mesh(new THREE.CylinderGeometry(.06,.06,.8,6),0x495057),0,3.4,0),place(mesh(new THREE.SphereGeometry(.2,8,6),0xff6b6b),0,3.9,0))}
+};
+SUBJECTS.forEach((s,i)=>{
+ const a=i/SUBJECTS.length*Math.PI*2-Math.PI/2,x=Math.cos(a)*17,z=Math.sin(a)*17;
+ const g=new THREE.Group();g.position.set(x,1.3,z);
+ g.add(place(mesh(new THREE.CylinderGeometry(3.6,3.9,.5,32),s.color),0,.25,0));
+ const glow=mesh(new THREE.RingGeometry(4.0,4.5,40),0xffffff,{transparent:true,opacity:.5,emissive:0xffffff});glow.rotation.x=-Math.PI/2;glow.position.y=.1;g.add(glow);
+ const b=new THREE.Group();b.position.y=.5;stationBuilders[s.id](b,s.color);g.add(b);
+ const icon=canvasSprite(128,128,(c,w,h)=>{c.font='96px sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillText(s.emoji,w/2,h/2+6)},2.6,2.6);icon.sp.position.y=7.6;g.add(icon.sp);
+ const label=canvasSprite(640,160,(c,w,h,st)=>{c.fillStyle='#fffffff0';c.beginPath();c.roundRect?c.roundRect(10,10,w-20,h-20,40):c.rect(10,10,w-20,h-20);c.fill();c.fillStyle='#1d2340';c.font='800 52px sans-serif';c.textAlign='center';c.fillText(s.name,w/2,76);c.fillStyle='#f59f00';c.font='46px sans-serif';c.fillText('★'.repeat(st||0)+'☆'.repeat(3-(st||0)),w/2,128)},7,1.75);label.sp.position.y=4.9+ (i%2?0:0);label.sp.position.y=5;label.sp.position.z=0;g.add(label.sp);
+ island.add(g);stations.push({sub:s,pos:new THREE.Vector3(x,0,z),group:g,glow,label,icon,build:b});
+});
+const refreshLabels=()=>stations.forEach(st=>st.label.redraw(starsOf(st.sub.id,S.tier)));
+
+/* player */
+const player=new THREE.Group();const pBody=new THREE.Group();player.add(pBody);
+const pMat=mat(0xffb703,{roughness:.4});
+pBody.add(place(mesh(new THREE.CylinderGeometry(.55,.65,1.1,16),pMat),0,.95,0),place(mesh(new THREE.SphereGeometry(.62,18,14),pMat),0,1.9,0),
+ place(mesh(new THREE.SphereGeometry(.14,8,6),0xffffff),-.22,2,.52),place(mesh(new THREE.SphereGeometry(.14,8,6),0xffffff),.22,2,.52),
+ place(mesh(new THREE.SphereGeometry(.07,8,6),0x111111),-.22,2,.64),place(mesh(new THREE.SphereGeometry(.07,8,6),0x111111),.22,2,.64),
+ place(mesh(new THREE.CylinderGeometry(.04,.04,.5,6),0x495057),0,2.65,0),place(mesh(new THREE.SphereGeometry(.12,8,6),0xff6b6b),0,2.95,0),
+ place(mesh(new THREE.SphereGeometry(.2,8,6),pMat),-.7,1,0),place(mesh(new THREE.SphereGeometry(.2,8,6),pMat),.7,1,0),
+ place(mesh(new THREE.SphereGeometry(.22,8,6),0x495057),-.28,.3,0),place(mesh(new THREE.SphereGeometry(.22,8,6),0x495057),.28,.3,0));
+const shadow=mesh(new THREE.CircleGeometry(.8,16),new THREE.MeshBasicMaterial({color:0,transparent:true,opacity:.25}));shadow.rotation.x=-Math.PI/2;shadow.position.y=.02;player.add(shadow);
+player.position.set(0,1.3,9);scene.add(player);
+const setColor=c=>pMat.color.set(c);
+
+/* ---------- quiz stage (far above the island) ---------- */
+const STAGE=new THREE.Vector3(0,300,0);
+const stage=new THREE.Group();stage.position.copy(STAGE);scene.add(stage);
+const backdrop=mesh(new THREE.SphereGeometry(60,24,16),new THREE.MeshBasicMaterial({color:0x223,side:THREE.BackSide,fog:false}));stage.add(backdrop);
+const floor=place(mesh(new THREE.CylinderGeometry(8,8.5,.5,40),0x2b2f4a,{metalness:.5,roughness:.35}),0,-.3,0);stage.add(floor);
+const floorRing=mesh(new THREE.TorusGeometry(7.5,.08,8,60),0xffffff,{emissive:0xffffff});floorRing.rotation.x=Math.PI/2;floorRing.position.y=0;stage.add(floorRing);
+const starsPts=(()=>{const n=300,p=new Float32Array(n*3);for(let i=0;i<n;i++){const u=rng()*Math.PI*2,v=Math.acos(2*rng()-1),r=40+rng()*15;p[i*3]=r*Math.sin(v)*Math.cos(u);p[i*3+1]=Math.abs(r*Math.cos(v))*.8;p[i*3+2]=r*Math.sin(v)*Math.sin(u)}const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(p,3));const pt=new THREE.Points(g,new THREE.PointsMaterial({color:0xffffff,size:.5,fog:false}));stage.add(pt);return pt})();
+let viz=null;
+function clearViz(){if(viz){stage.remove(viz);viz.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material&&o.material.map)o.material.map.dispose()});viz=null}}
+const S3=(r,c,o)=>mesh(new THREE.SphereGeometry(r,24,18),c,o);
+const vizBuild={
+ gem(){const g=new THREE.Group();const m=mesh(new THREE.IcosahedronGeometry(1.5,0),0x74c0fc,{metalness:.4,roughness:.2,flatShading:true});m.position.y=2.2;g.add(m);g.userData.update=t=>{m.rotation.y=t;m.rotation.x=t*.5};return g},
+ count(n){const g=new THREE.Group();n=Math.min(n,30);const per=n>10?10:5,sp=n>10?.9:1.3;for(let i=0;i<n;i++){const col=i%per,row=Math.floor(i/per);const a=new THREE.Group();a.add(S3(.42,0xff4d4d,{roughness:.4}),place(mesh(new THREE.CylinderGeometry(.03,.03,.25,5),0x5c3b1e),0,.45,0),place(mesh(new THREE.SphereGeometry(.14,8,6),0x51cf66),.12,.5,0));const w=Math.min(n,per);a.position.set((col-(w-1)/2)*sp,.6+row*.9+.4,0);a.userData.ph=i;g.add(a)}g.userData.update=t=>g.children.forEach(a=>a.position.y+=Math.sin(t*3+a.userData.ph)*.002);return g},
+ shape(k){const geo={cube:new THREE.BoxGeometry(2,2,2),sphere:new THREE.SphereGeometry(1.2,24,18),cone:new THREE.ConeGeometry(1.2,2.4,24),cyl:new THREE.CylinderGeometry(1,1,2.4,24),torus:new THREE.TorusGeometry(1.1,.45,16,32)}[k];const g=new THREE.Group();const m=mesh(geo,0xffa94d);m.position.y=2.2;g.add(m);g.userData.update=t=>{m.rotation.y=t;m.rotation.x=.4};return g},
+ blocks(){const g=new THREE.Group();for(let i=0;i<10;i++){const b=mesh(new THREE.BoxGeometry(.7,.7,.7),[0xff7043,0xffa94d,0xffd43b,0x51cf66][i%4]);b.position.set(((i%5)-2)*.85,.5+Math.floor(i/5)*.85,0);g.add(b)}g.userData.update=t=>{g.rotation.y=Math.sin(t)*.4};return g},
+ pie(n){const g=new THREE.Group();for(let i=0;i<n;i++){const geo=new THREE.CylinderGeometry(2,2,.6,24,1,false,i/n*Math.PI*2,Math.PI*2/n-.05);const m=mesh(geo,i===0?0xff6b6b:0xffd43b);m.position.y=1;g.add(m)}g.rotation.x=.9;g.userData.update=t=>{g.rotation.y=Math.sin(t)*.5};return g},
+ rect(w,h){const g=new THREE.Group();const sc=Math.min(7/w,4/h,1);const m=mesh(new THREE.BoxGeometry(w*sc,.4,h*sc),0x74c0fc);m.position.y=1;g.add(m);const l=canvasSprite(256,128,(c,W,H)=>{c.fillStyle='#fff';c.font='800 70px sans-serif';c.textAlign='center';c.fillText(`${w} × ${h}`,W/2,90)},4,2);l.sp.position.y=2.6;g.add(l.sp);g.rotation.y=.3;return g},
+ balance(){const g=new THREE.Group();g.add(place(mesh(new THREE.CylinderGeometry(.15,.15,2.6,8),0xced4da),0,1.3,0));const beam=place(mesh(new THREE.BoxGeometry(5,.2,.3),0xffd43b),0,2.6,0);g.add(beam);beam.add(place(mesh(new THREE.CylinderGeometry(.9,.9,.2,16),0xff6b6b),-2.2,-.5,0),place(mesh(new THREE.CylinderGeometry(.9,.9,.2,16),0x4dabf7),2.2,-.5,0));g.userData.update=t=>{beam.rotation.z=Math.sin(t*1.5)*.08};return g},
+ plant(){const g=new THREE.Group();g.add(place(mesh(new THREE.CylinderGeometry(.8,.6,.9,16),0xc2703d),0,.5,0),place(mesh(new THREE.CylinderGeometry(.08,.1,1.8,6),0x2f9e44),0,1.8,0));for(let i=0;i<4;i++){const l=mesh(new THREE.SphereGeometry(.6,10,8),0x51cf66);l.scale.set(1,.2,.5);l.position.set(Math.cos(i*1.57)*.6,1.8+i*.25,Math.sin(i*1.57)*.6);l.rotation.y=-i*1.57;g.add(l)}g.add(place(S3(.7,0xffd43b,{emissive:0xffb700,emissiveIntensity:.8}),3,4,0));g.userData.update=t=>{g.rotation.y=t*.4};return g},
+ drop(){const g=new THREE.Group();g.add(place(S3(1,0x4dabf7,{transparent:true,opacity:.85}),0,2,0),place(mesh(new THREE.ConeGeometry(.97,1.5,24),0x4dabf7,{transparent:true,opacity:.85}),0,3.4,0));g.userData.update=t=>{g.position.y=Math.sin(t*2)*.2};return g},
+ ice(){const g=new THREE.Group();const m=mesh(new THREE.BoxGeometry(2,2,2),0xa5d8ff,{transparent:true,opacity:.7,roughness:.1});m.position.y=1.5;g.add(m);g.userData.update=t=>{m.rotation.y=t*.6};return g},
+ atom(){const g=new THREE.Group();g.add(place(S3(.6,0xff6b6b),0,2.3,0));const es=[];for(let i=0;i<3;i++){const o=mesh(new THREE.TorusGeometry(1.8,.03,6,48),0xffffff);o.position.y=2.3;o.rotation.set(i*1.05,i*.7,0);g.add(o);const e=S3(.22,0x4dabf7);g.add(e);es.push(e)}g.userData.update=t=>es.forEach((e,i)=>{const a=t*2+i*2.1;e.position.set(Math.cos(a)*1.8,2.3+Math.sin(a)*1.8*Math.sin(i*1.05)*.7,Math.sin(a)*1.8*Math.cos(i*1.05)*.7+0)});return g},
+ planet(k){const g=new THREE.Group();const info={sun:[0xffd43b,1.7],earth:[0x339af0,1.6],moon:[0xced4da,1.2],saturn:[0xe9c46a,1.4],venus:[0xf4a261,1.5]}[k]||[0x74c0fc,1.5];const p=S3(info[1],info[0],k==='sun'?{emissive:0xffa000,emissiveIntensity:.9}:{});p.position.y=2.4;g.add(p);if(k==='earth')for(let i=0;i<5;i++){const c=S3(.5,0x51cf66);c.scale.set(1,1,.2);const a=i*1.3,b=i*.9-1;c.position.set(Math.cos(a)*1.55*Math.cos(b),Math.sin(b)*1.55,Math.sin(a)*1.55*Math.cos(b));c.lookAt(0,0,0);p.add(c)}if(k==='saturn'){const r=mesh(new THREE.RingGeometry(2,3,48),0xf1e0b0,{side:THREE.DoubleSide});r.rotation.x=1.2;r.position.y=2.4;g.add(r)}g.userData.update=t=>{p.rotation.y=t*.4};return g},
+ solar(){const g=new THREE.Group();g.add(place(S3(.9,0xffd43b,{emissive:0xffa000,emissiveIntensity:.9}),0,2.4,0));const ps=[];[0xadb5bd,0xf4a261,0x339af0,0xe03131,0xe9c46a,0xf1e0b0,0x66d9e8,0x4263eb].forEach((c,i)=>{const p=S3(.2+i*.01,c);g.add(p);ps.push([p,1.3+i*.45,1.2/(i+1)+.2])});g.userData.update=t=>ps.forEach(([p,r,s])=>p.position.set(Math.cos(t*s)*r,2.4,Math.sin(t*s)*r));return g},
+ globe(){const g=new THREE.Group();const e=S3(1.7,0x339af0);e.position.y=2.4;g.add(e);for(let i=0;i<7;i++){const c=S3(.55+rng()*.3,0x51cf66);c.scale.z=.25;const a=i*.9,b=Math.sin(i*2)*.9;c.position.set(Math.cos(a)*1.65*Math.cos(b),Math.sin(b)*1.65,Math.sin(a)*1.65*Math.cos(b));c.lookAt(0,0,0);e.add(c)}g.userData.update=t=>{e.rotation.y=t*.5};return g},
+ pyramid(){const g=new THREE.Group();const p=mesh(new THREE.ConeGeometry(2.2,2.8,4),0xe9c46a);p.position.y=1.8;p.rotation.y=Math.PI/4;g.add(p);g.userData.update=t=>{g.rotation.y=t*.4};return g},
+ mix(a,b){const g=new THREE.Group();const A=S3(1,new THREE.Color(a)),B=S3(1,new THREE.Color(b));[A,B].forEach(m=>{m.material=mat(m===A?a:b,{emissive:m===A?a:b,emissiveIntensity:.25});g.add(m)});const q=canvasSprite(128,128,(c,w,h)=>{c.fillStyle='#fff';c.font='800 110px sans-serif';c.textAlign='center';c.fillText('+',w/2,100)},1.4,1.4);q.sp.position.y=2.2;g.add(q.sp);g.userData.update=t=>{const d=2.2+Math.sin(t*1.5)*.3;A.position.set(-d,2.2,0);B.position.set(d,2.2,0)};return g},
+ palette(){const g=new THREE.Group();g.add(place(mesh(new THREE.CylinderGeometry(2.4,2.4,.3,32),0xffe8cc),0,1.2,0));[0xff6b6b,0xffd43b,0x4dabf7,0x51cf66,0x9775fa,0xff922b].forEach((c,i)=>g.add(place(S3(.45,c),Math.cos(i*1.05)*1.5,1.6,Math.sin(i*1.05)*1.5)));g.rotation.x=.5;g.userData.update=t=>{g.rotation.y=t*.5};return g},
+ note(f){const g=new THREE.Group();const bars=[];for(let i=0;i<9;i++){const b=mesh(new THREE.BoxGeometry(.5,1,.5),new THREE.Color().setHSL(i/9,.8,.6));b.position.set((i-4)*.8,1,0);g.add(b);bars.push(b)}g.userData.update=t=>{const sp=Math.min(f/60,14);bars.forEach((b,i)=>{const h=1+Math.abs(Math.sin(t*sp*.5+i*.7))*2.5;b.scale.y=h;b.position.y=h/2+.3})};return g},
+ drum(){const g=new THREE.Group();const d=mesh(new THREE.CylinderGeometry(1.6,1.6,1.4,32),0xf03e3e);d.position.y=1.2;g.add(d,place(mesh(new THREE.CylinderGeometry(1.62,1.62,.1,32),0xfff3bf),0,1.95,0));g.userData.update=t=>{d.scale.y=1+Math.max(0,Math.sin(t*6))*.05};return g},
+ heart(){const g=new THREE.Group();const h=new THREE.Group();h.add(place(S3(1,0xff4d4d),-.7,0,0),place(S3(1,0xff4d4d),.7,0,0));const c=mesh(new THREE.ConeGeometry(1.75,2.2,4),0xff4d4d);c.rotation.set(0,Math.PI/4,Math.PI);c.position.y=-1;h.add(c);h.position.y=2.6;g.add(h);g.userData.update=t=>{const s=1+Math.max(0,Math.sin(t*5))*.12;h.scale.set(s,s,s)};return g},
+ book(){const g=new THREE.Group();const l=place(mesh(new THREE.BoxGeometry(2.4,.25,3),0xffffff),-1.25,1.4,0);l.rotation.z=.25;const r=place(mesh(new THREE.BoxGeometry(2.4,.25,3),0xffffff),1.25,1.4,0);r.rotation.z=-.25;g.add(l,r,place(mesh(new THREE.BoxGeometry(.3,.6,3.1),0xf06595),0,1,0));const t=canvasSprite(256,128,(c,w,h)=>{c.fillStyle='#fff';c.font='800 90px sans-serif';c.textAlign='center';c.fillText('A B C',w/2,95)},4,2);t.sp.position.y=3.6;g.add(t.sp);g.userData.update=t=>{g.rotation.y=Math.sin(t)*.5};return g},
+ robot(){const g=new THREE.Group();g.add(place(mesh(new THREE.BoxGeometry(2,2,1.6),0xced4da,{metalness:.5}),0,2,0),place(S3(.3,0x20c997,{emissive:0x12b886,emissiveIntensity:1}),-.5,2.3,.85),place(S3(.3,0x20c997,{emissive:0x12b886,emissiveIntensity:1}),.5,2.3,.85),place(mesh(new THREE.BoxGeometry(1,.15,.1),0x495057),0,1.6,.82),place(mesh(new THREE.BoxGeometry(2.4,1.8,1.4),0x868e96),0,.2+0*0,0),place(mesh(new THREE.CylinderGeometry(.05,.05,.7,6),0x495057),0,3.35,0));const bulb=place(S3(.18,0xff6b6b,{emissive:0xff0000,emissiveIntensity:1}),0,3.8,0);g.add(bulb);g.position.y=.9;g.userData.update=t=>{g.rotation.y=Math.sin(t)*.5;bulb.scale.setScalar(1+Math.sin(t*6)*.3)};return g},
+ net(){const g=new THREE.Group();const layers=[3,4,4,2],nodes=[];layers.forEach((n,l)=>{nodes[l]=[];for(let i=0;i<n;i++){const s=S3(.28,[0x4dabf7,0x9775fa,0x9775fa,0x51cf66][l],{emissive:0x333366,emissiveIntensity:.5});s.position.set((l-1.5)*2.2,2.4+(i-(n-1)/2)*1.2,0);g.add(s);nodes[l].push(s)}});const pts=[];for(let l=0;l<3;l++)nodes[l].forEach(a=>nodes[l+1].forEach(b=>pts.push(a.position.clone(),b.position.clone())));g.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts),new THREE.LineBasicMaterial({color:0xffffff,transparent:true,opacity:.5})));g.userData.update=t=>nodes.forEach((L,l)=>L.forEach((s,i)=>{const k=1+Math.max(0,Math.sin(t*3-l*1.2))*.5;s.scale.setScalar(k)}));return g},
+ tiles(p){const g=new THREE.Group();const col={R:0xff6b6b,B:0x4dabf7,G:0x51cf66};[...p].forEach((ch,i)=>{const b=mesh(new THREE.BoxGeometry(1,1,1),col[ch]||0xffd43b);b.position.set((i-(p.length-1)/2)*1.3,1.2,0);b.userData.i=i;g.add(b)});g.userData.update=t=>g.children.forEach(b=>{b.position.y=1.2+Math.max(0,Math.sin(t*3-b.userData.i*.8))*.5});return g},
+ bits(p){const g=new THREE.Group();[...p].forEach((ch,i)=>{const on=ch==='1';const b=mesh(new THREE.BoxGeometry(1.2,1.2,1.2),on?0xffd43b:0x495057,on?{emissive:0xffb700,emissiveIntensity:.7}:{});b.position.set((i-(p.length-1)/2)*1.6,1.4,0);g.add(b)});g.userData.update=t=>{g.rotation.y=Math.sin(t)*.3};return g}
+};
+function showViz(spec){clearViz();const [k,arg]=spec.split(':');let g;
+ try{ if(k==='count')g=vizBuild.count(+arg);else if(k==='mix')g=vizBuild.mix(...arg.split(','));else if(k==='rect')g=vizBuild.rect(...arg.split(',').map(Number));else if(k==='pie')g=vizBuild.pie(+arg);else if(k==='note')g=vizBuild.note(+arg);else if(k==='planet')g=vizBuild.planet(arg);else if(k==='tiles')g=vizBuild.tiles(arg);else if(k==='bits')g=vizBuild.bits(arg);else g=(vizBuild[k]||vizBuild.gem)(arg)}catch(e){g=vizBuild.gem()}
+ viz=g;stage.add(g)}
+
+/* confetti */
+const conf=[];const confGeo=new THREE.BoxGeometry(.18,.18,.04);
+function confetti(origin,n=50){for(let i=0;i<n;i++){const m=new THREE.Mesh(confGeo,new THREE.MeshBasicMaterial({color:new THREE.Color().setHSL(Math.random(),.9,.6),transparent:true,fog:false}));m.position.copy(origin);scene.add(m);conf.push({m,v:new THREE.Vector3((Math.random()-.5)*7,Math.random()*7+3,(Math.random()-.5)*7),life:1.6})}}
+function updConf(dt){for(let i=conf.length-1;i>=0;i--){const c=conf[i];c.v.y-=12*dt;c.m.position.addScaledVector(c.v,dt);c.m.rotation.x+=dt*8;c.m.rotation.y+=dt*6;c.life-=dt;c.m.material.opacity=Math.max(0,Math.min(1,c.life));if(c.life<=0){scene.remove(c.m);c.m.material.dispose();conf.splice(i,1)}}}
+
+/* ---------- game state & input ---------- */
+let mode='title',near_=null,target=null,t=0;
+const keys={};
+addEventListener('keydown',e=>{
+ const k=e.key.toLowerCase();keys[k]=true;
+ if(mode==='island'&&near_&&(k==='e'||k==='enter'||k===' '))enterZone(near_);
+ if(mode==='quiz'){if(['1','2','3'].includes(k)){const b=$('qans').children[+k-1];b&&b.click()}else if((k==='enter'||k===' ')&&!$('qfb').classList.contains('hidden'))$('qnext').click()}
+ if(k.startsWith('arrow')||k===' ')e.preventDefault()});
+addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+const joy={x:0,y:0};let ptr=null;
+canvas.addEventListener('pointerdown',e=>{if(mode!=='island')return;ptr={x:e.clientX,y:e.clientY,id:e.pointerId,drag:false};canvas.setPointerCapture(e.pointerId)});
+canvas.addEventListener('pointermove',e=>{if(!ptr||e.pointerId!==ptr.id)return;const dx=e.clientX-ptr.x,dy=e.clientY-ptr.y;if(Math.hypot(dx,dy)>14)ptr.drag=true;if(ptr.drag){const m=Math.hypot(dx,dy),k=Math.min(1,m/70);joy.x=dx/m*k;joy.y=dy/m*k}});
+const ray=new THREE.Raycaster(),gnd=new THREE.Plane(new THREE.Vector3(0,1,0),-1.3);
+canvas.addEventListener('pointerup',e=>{if(!ptr||e.pointerId!==ptr.id)return;if(!ptr.drag){const v=new THREE.Vector2(e.clientX/innerWidth*2-1,-(e.clientY/innerHeight)*2+1);ray.setFromCamera(v,camera);const p=new THREE.Vector3();if(ray.ray.intersectPlane(gnd,p)){let tp=new THREE.Vector2(p.x,p.z);const st=stations.find(s=>s.pos.distanceTo(new THREE.Vector3(p.x,0,p.z))<4.6);if(st){const d=new THREE.Vector2(player.position.x-st.pos.x,player.position.z-st.pos.z).normalize();tp=new THREE.Vector2(st.pos.x+d.x*5,st.pos.z+d.y*5)}target=tp;sfx.click()}}ptr=null;joy.x=joy.y=0});
+canvas.addEventListener('pointercancel',()=>{ptr=null;joy.x=joy.y=0});
+
+const SPEED=9;let camLook=new THREE.Vector3(0,1.5,9);
+function updateIsland(dt){
+ let vx=(keys['d']||keys['arrowright']?1:0)-(keys['a']||keys['arrowleft']?1:0)+joy.x;
+ let vz=(keys['s']||keys['arrowdown']?1:0)-(keys['w']||keys['arrowup']?1:0)+joy.y;
+ let m=Math.hypot(vx,vz);
+ if(m>.08){if(m>1){vx/=m;vz/=m}target=null}
+ else if(target){const dx=target.x-player.position.x,dz=target.y-player.position.z,d=Math.hypot(dx,dz);if(d<.35){target=null;vx=vz=0}else{vx=dx/d;vz=dz/d}}else{vx=vz=0}
+ m=Math.hypot(vx,vz);
+ player.position.x+=vx*SPEED*dt;player.position.z+=vz*SPEED*dt;
+ const r=Math.hypot(player.position.x,player.position.z);if(r>31.5){player.position.x*=31.5/r;player.position.z*=31.5/r}
+ stations.forEach(s=>{const dx=player.position.x-s.pos.x,dz=player.position.z-s.pos.z,d=Math.hypot(dx,dz);if(d<3.6){player.position.x=s.pos.x+dx/d*3.6;player.position.z=s.pos.z+dz/d*3.6}});
+ if(m>.08){const a=Math.atan2(vx,vz);let da=a-player.rotation.y;da=Math.atan2(Math.sin(da),Math.cos(da));player.rotation.y+=da*Math.min(1,dt*12);pBody.position.y=Math.abs(Math.sin(t*14))*.12;pBody.rotation.z=Math.sin(t*14)*.06}else{pBody.position.y*=.8;pBody.rotation.z*=.8}
+ // camera
+ const want=new THREE.Vector3(player.position.x*.9,12.5,player.position.z*.9+15);camera.position.lerp(want,1-Math.pow(.0005,dt));
+ camLook.lerp(new THREE.Vector3(player.position.x,1.6,player.position.z),1-Math.pow(.0005,dt));camera.lookAt(camLook);
+ // nearest station
+ let best=null,bd=6.4;stations.forEach(s=>{const d=Math.hypot(player.position.x-s.pos.x,player.position.z-s.pos.z);if(d<bd){bd=d;best=s}});
+ if(best!==near_){near_=best;const p=$('prompt');if(best){$('btnEnter').textContent=`${best.sub.emoji} Enter ${best.sub.name}`;p.classList.remove('hidden');sfx.click()}else p.classList.add('hidden')}
+ stations.forEach(s=>{const on=s===near_;s.glow.material.opacity=on?.5+Math.sin(t*6)*.3:.25;s.icon.sp.position.y=7.6+Math.sin(t*2+s.pos.x)*.25;if(s.group.userData.spin)s.group.userData.spin.rotation.y=t;
+  if(s.build.userData.beat){const k=1+Math.max(0,Math.sin(t*4))*.1;s.build.userData.beat.scale.setScalar(k)}
+  s.build.rotation.y=on?Math.sin(t*3)*.15:0});
+ clouds.forEach(c=>{c.position.x+=dt*1.2;if(c.position.x>100)c.position.x=-100});
+ water.position.y=-1.2+Math.sin(t)*.08;
+}
+function updateStage(dt){if(viz&&viz.userData.update)viz.userData.update(t);starsPts.rotation.y+=dt*.02}
+
+/* ---------- screens ---------- */
+function fade(fn){const f=$('fade');f.classList.add('on');setTimeout(()=>{fn();setTimeout(()=>f.classList.remove('on'),60)},320)}
+function hudRefresh(){$('hudName').textContent='🤖 '+S.name;$('hudStars').textContent='⭐ '+totalStars();$('hudTier').textContent='Level: '+tierName[S.tier];$('btnVoice').style.opacity=S.voice?1:.4;$('btnSound').textContent=S.sound?'🔊':'🔇';refreshLabels()}
+
+// title screen
+(()=>{
+ const cols=['#ffb703','#ff6b6b','#4dabf7','#51cf66','#b197fc','#f783ac'];
+ $('colors').innerHTML='';cols.forEach(c=>{const b=document.createElement('button');b.className='dot'+(c===S.color?' sel':'');b.style.background=c;b.setAttribute('aria-label','color '+c);b.onclick=()=>{S.color=c;[...$('colors').children].forEach(x=>x.classList.toggle('sel',x===b));setColor(c)};$('colors').appendChild(b)});
+ const ages=[...$('ages').children];const selAge=t=>{S.tier=t;ages.forEach((a,i)=>a.classList.toggle('sel',i===t))};ages.forEach((a,i)=>a.onclick=()=>{selAge(i);S.voice=(i===0)});selAge(S.tier);
+ $('name').value=S.name==='Explorer'?'':S.name;setColor(S.color);
+ $('btnStart').onclick=()=>{S.name=($('name').value.trim()||'Explorer').slice(0,14);ac();if(AC&&AC.state==='suspended')AC.resume();save();$('title').classList.add('hidden');$('hud').classList.remove('hidden');$('help').classList.remove('hidden');setTimeout(()=>$('help').style.opacity=0,9000);mode='island';hudRefresh();sfx.win();speak(`Welcome to Wonder Island, ${S.name}!`)};
+})();
+$('btnVoice').onclick=()=>{S.voice=!S.voice;if(!S.voice&&window.speechSynthesis)speechSynthesis.cancel();save();hudRefresh()};
+$('btnSound').onclick=()=>{S.sound=!S.sound;save();hudRefresh()};
+$('btnEnter').onclick=()=>near_&&enterZone(near_);
+$('hudTier').onclick=()=>{};
+
+/* ---------- quiz ---------- */
+let Z=null; // current zone session
+function enterZone(st){
+ if(mode!=='island')return;mode='transition';$('prompt').classList.add('hidden');
+ fade(()=>{Z={st,sub:st.sub,tier:S.tier,qs:questionsFor(st.sub,S.tier),i:0,first:0,wrong:0};
+  backdrop.material.color.set(new THREE.Color(st.sub.color).multiplyScalar(.35));floorRing.material.color.set(st.sub.color);floorRing.material.emissive.set(st.sub.color);
+  camera.position.set(STAGE.x,STAGE.y+3.2,STAGE.z+11);camera.lookAt(STAGE.x,STAGE.y+.4,STAGE.z);
+  $('hud').classList.add('hidden');$('help').classList.add('hidden');$('quiz').classList.remove('hidden');mode='quiz';showQ()});
+}
+function showQ(){
+ const q=Z.qs[Z.i];Z.wrong=0;Z.done=false;
+ $('qzone').textContent=`${Z.sub.emoji} ${Z.sub.name} · ${tierName[Z.tier]}`;
+ $('qdots').innerHTML=Z.qs.map((_,k)=>`<span class="${k<Z.i?'on':k===Z.i?'cur':''}"></span>`).join('');
+ $('qtext').textContent=q.q;$('qfb').classList.add('hidden');
+ const ans=shuffle([q.a,...q.w]);$('qans').innerHTML='';
+ ans.forEach(a=>{const b=document.createElement('button');b.textContent=a;b.onclick=()=>choose(b,a===q.a,q);$('qans').appendChild(b)});
+ $('qlisten').classList.toggle('hidden',!q.viz.startsWith('note'));
+ showViz(q.viz);speak(q.q);
+ if(q.viz.startsWith('note'))setTimeout(()=>tone(+q.viz.split(':')[1],.9,'triangle',.2),500);
+}
+function choose(btn,ok,q){
+ if(Z.done)return;
+ if(ok){Z.done=true;btn.classList.add('good');[...$('qans').children].forEach(b=>b.disabled=true);if(Z.wrong===0)Z.first++;sfx.good();confetti(STAGE.clone().add(new THREE.Vector3(0,3,2)));
+  fb(`✅ ${Z.wrong?'You got it!':'Awesome!'} ${q.fact}`,false);speak(q.fact)}
+ else{Z.wrong++;btn.classList.add('bad','shake');btn.disabled=true;sfx.bad();
+  if(Z.wrong>=2){Z.done=true;[...$('qans').children].forEach(b=>{b.disabled=true;if(b.textContent===q.a)b.classList.add('good')});fb(`The answer is “${q.a}”. ${q.fact}`,false)}
+  else{fb('🤔 Not quite. Try again!',true)}}
+}
+function fb(msg,tryAgain){const f=$('qfb');f.classList.remove('hidden');f.classList.toggle('try',tryAgain);$('qfbtext').textContent=msg;$('qnext').classList.toggle('hidden',tryAgain);if(!tryAgain)$('qnext').textContent=Z.i===Z.qs.length-1?'Finish ▶':'Next ▶'}
+$('qnext').onclick=()=>{if(Z.i<Z.qs.length-1){Z.i++;showQ()}else finishZone()};
+$('qspeak').onclick=()=>{const was=S.voice;S.voice=true;speak(Z.qs[Z.i].q);S.voice=was};
+$('qlisten').onclick=()=>{const q=Z.qs[Z.i];tone(+q.viz.split(':')[1],.9,'triangle',.2)};
+$('qexit').onclick=()=>{if(window.speechSynthesis)speechSynthesis.cancel();backToIsland()};
+function finishZone(){
+ const earned=Math.max(1,Z.first);const id=Z.sub.id;S.stars[id]=S.stars[id]||[0,0,0];S.stars[id][Z.tier]=Math.max(S.stars[id][Z.tier]||0,earned);save();
+ $('quiz').classList.add('hidden');sfx.win();confetti(STAGE.clone().add(new THREE.Vector3(0,4,3)),90);
+ $('sumTitle').textContent=earned===3?'🌟 Perfect!':earned===2?'Great job!':'Nice work!';
+ $('sumStars').textContent='★'.repeat(earned)+'☆'.repeat(3-earned);
+ $('sumText').textContent=`${Z.first} of ${Z.qs.length} answers right on the first try. ${earned<3?'Play again to earn more stars!':'You mastered this level!'}`;
+ $('sumEasier').classList.toggle('hidden',Z.tier===0);$('sumHarder').classList.toggle('hidden',Z.tier===2);
+ $('summary').classList.remove('hidden');speak(earned===3?'Perfect! You are a star!':'Nice work!');
+}
+function again(tier){$('summary').classList.add('hidden');const st=Z.st;S.tier=tier;Z=null;mode='island';enterZone(st)}
+$('sumAgain').onclick=()=>again(Z.tier);
+$('sumEasier').onclick=()=>again(Math.max(0,Z.tier-1));
+$('sumHarder').onclick=()=>again(Math.min(2,Z.tier+1));
+$('sumHome').onclick=()=>{$('summary').classList.add('hidden');backToIsland()};
+function backToIsland(){
+ mode='transition';
+ fade(()=>{clearViz();$('quiz').classList.add('hidden');$('summary').classList.add('hidden');$('hud').classList.remove('hidden');
+  camera.position.set(player.position.x*.9,12.5,player.position.z*.9+15);camLook.set(player.position.x,1.6,player.position.z);
+  Z=null;near_=null;mode='island';hudRefresh();
+  const all=SUBJECTS.every(s=>starsOf(s.id,S.tier)>=3);if(all)speak('You mastered every zone on this level! Try a harder level!')});
+}
+
+/* ---------- main loop ---------- */
+const clock=new THREE.Clock();
+(function loop(){requestAnimationFrame(loop);const dt=Math.min(clock.getDelta(),.05);t+=dt;
+ if(mode==='island'||mode==='title'){if(mode==='title'){camera.position.set(Math.cos(t*.15)*30,14,Math.sin(t*.15)*30);camera.lookAt(0,2,0);clouds.forEach(c=>c.position.x+=dt)}else updateIsland(dt)}
+ else if(mode==='quiz'){updateStage(dt);camera.position.set(STAGE.x+Math.sin(t*.3)*1.5,STAGE.y+3.2,STAGE.z+11);camera.lookAt(STAGE.x,STAGE.y+.4,STAGE.z)}
+ updConf(dt);renderer.render(scene,camera)})();
+refreshLabels();
+window.__wonder={S,stations,enterZone,get mode(){return mode},player,SUBJECTS,MATH};
+})();
+</script>
+</body>
+</html>
